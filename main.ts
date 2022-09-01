@@ -1,7 +1,7 @@
 require("dotenv").config();
 import Discord from "discord.js-selfbot-v13";
 import COMMANDS from "./commands";
-import { contextFactory } from "./commands/_utils";
+import { contextFactory, notAllowed } from "./commands/_utils";
 import { OWNER_ID, PREFIX, REJECT, TOKEN } from "./config";
 import { Stream } from "./stream";
 let users = require("./users.json");
@@ -11,14 +11,6 @@ let loop = false;
 const client = new Discord.Client();
 
 let stream = new Stream(TOKEN);
-
-const notAllowed = (msg: Discord.Message<boolean>) => {
-  return (
-    stream.owner !== msg.author.id &&
-    stream.owner !== OWNER_ID &&
-    !msg.member?.permissions.has("ADMINISTRATOR")
-  );
-};
 
 client.on("ready", () => {
   console.log("Bot started");
@@ -36,7 +28,7 @@ client.on("messageCreate", (msg) => {
   }
   switch (command) {
     case "loop":
-      if (notAllowed(msg)) msg.react(REJECT);
+      if (notAllowed(stream, msg)) msg.react(REJECT);
       else {
         if (!loop) {
           loop = true;
