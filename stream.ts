@@ -1,12 +1,24 @@
-const webdriver = require("selenium-webdriver");
-const chrome = require("selenium-webdriver/chrome");
-const ytdl = require("ytdl-core");
+import type Discord from "discord.js-selfbot-v13";
+import webdriver from "selenium-webdriver";
+import chrome from "selenium-webdriver/chrome";
+import ytdl from "ytdl-core";
 
 class Video {
-  async load(url, youtube_dl, msg) {
+  owner: string | undefined;
+  in_progress = false;
+  in_loading = false;
+  init = false;
+  killed = false;
+  driver: webdriver.ThenableWebDriver | undefined;
+  guild_id: string | undefined;
+  channel_id: string | undefined;
+  duration: any;
+  client_url = `file://${__dirname}/client/index.html`;
+
+  async load(url: string, youtube_dl: boolean, msg: Discord.Message<boolean>) {
     if (this.in_loading) return;
     this.in_loading = true;
-    this.driver.executeScript("video.innerHTML = null");
+    this.driver?.executeScript("video.innerHTML = null");
 
     if (youtube_dl) {
       await msg.edit("Fetching video formats...").then(async (msg) => {
@@ -14,8 +26,8 @@ class Video {
         try {
           let info = await ytdl.getInfo(url);
           let formats = info.formats.filter((f) => f.hasVideo && f.hasAudio);
-          formats = formats.filter((f) => f.height <= 720 && f.fps <= 30);
-          formats = formats.sort((a, b) => b.height - a.height);
+          formats = formats.filter((f) => (f?.height || 0) <= 720 && (f.fps || 0) <= 30);
+          formats = formats.sort((a, b) => (b.height || 0) - (a.height || 0));
 
           url = formats[0].url;
         } catch (e) {
@@ -24,7 +36,7 @@ class Video {
       });
     }
 
-    await this.driver.executeScript(`video.src='${url}'`).then(() => {
+    await this.driver?.executeScript(`video.src='${url}'`).then(() => {
       console.log("Loading...");
       msg.edit("Loading...").then(() => {
         var int1 = setInterval(() => {
@@ -39,11 +51,11 @@ class Video {
             clearInterval(int3);
           }
 
-          this.driver.getCurrentUrl().then((url) => {
+          this.driver?.getCurrentUrl().then((url) => {
             if (!this.init && url === "file:///channels/@me") {
               this.init = true;
               this.open_guild();
-              this.join(msg);
+              this.join();
               clearInterval(int1);
             } else if (this.init) clearInterval(int1);
           });
@@ -52,12 +64,14 @@ class Video {
     });
 
     // Wait until video load
-    let is_load;
+    let is_load: boolean = false;
+    let is_error: boolean = false;
     var int2 = setInterval(() => {
-      this.driver.executeScript("return video.duration").then((result) => {
+      this.driver?.executeScript("return video.duration").then((result) => {
         if (result) {
+          // TODO: Check result type
           is_load = true;
-          this.duration = result;
+          this.duration = result as any;
           this.in_loading = false;
           msg.edit("Done, Type `*play` to start playing.");
           clearInterval(int2);
@@ -66,14 +80,14 @@ class Video {
     }, 10);
 
     // Error event
-    let is_error;
+
     var int3 = setInterval(() => {
-      this.driver.executeScript("return video_error").then((error_msg) => {
+      this.driver?.executeScript("return video_error").then((error_msg) => {
         if (error_msg) {
           msg.edit(":no_entry_sign: " + error_msg);
           is_error = true;
           this.in_loading = false;
-          this.driver.executeScript('video_error = ""');
+          this.driver?.executeScript('video_error = ""');
           clearInterval(int3);
           return;
         } else if (is_load) clearInterval(int3);
@@ -81,50 +95,88 @@ class Video {
     }, 10);
   }
 
+  start() {
+    this.driver
+      ?.executeScript(
+        `
+                var streamBtn_inject = document.querySelector('[aria-label="Share Your Screen"]')
+                !streamBtn_inject.className.includes('buttonActive-3FrkXp') &&
+                    streamBtn_inject.click()
+        `,
+      )
+      .catch((e) => e);
+  }
+
   play() {
     console.log("Play");
     this.start();
-    this.driver.executeScript("video.play()");
+    this.driver?.executeScript("video.play()");
   }
 
   pause() {
     console.log("Pause");
-    this.driver.executeScript("video.pause()");
+    this.driver?.executeScript("video.pause()");
   }
 
-  current(time = "") {
+  current(time?: string) {
     if (time) {
       if (time[0] === "+" || time[0] === "-") {
-        this.current().then((c) => {
+        this.current()?.then((c) => {
           if (!c) return;
 
           let r;
-          c = parseFloat(c);
+          const v = parseFloat(c);
           const s = parseInt(time.slice(1));
 
-          time[0] === "+" ? (r = c + s) : (r = c - s);
+          time[0] === "+" ? (r = v + s) : (r = v - s);
 
-          this.driver.executeScript(`video.currentTime = ${r}`);
+          this.driver?.executeScript(`video.currentTime = ${r}`);
         });
-      } else this.driver.executeScript(`video.currentTime = ${time}`);
-    } else return this.driver.executeScript("return video.currentTime");
+      } else this.driver?.executeScript(`video.currentTime = ${time}`);
+    } else return this.driver?.executeScript<string>("return video.currentTime");
   }
 
-  hms(sec) {
+  open_guild() {
+    this.driver?.executeScript(
+      `document.querySelector('[data-list-item-id="guildsnav___${this.guild_id}"]').click()`,
+    );
+  }
+
+  join() {
+    var intJoin = setInterval(() => {
+      this.driver
+        ?.executeScript(
+          `document.querySelector("[data-list-item-id='channels___${this.channel_id}']").click()`,
+        )
+        .then(() => {
+          setTimeout(() => {
+            this.start();
+          }, 1000);
+
+          clearInterval(intJoin);
+        })
+        .catch(() => this.scroll());
+    }, 10);
+  }
+
+  hms(sec: number) {
     if (sec) return new Date(sec * 1000).toISOString().substr(11, 8);
     return sec;
   }
+
+  scroll() {
+    this.driver?.executeScript(`
+            var c_inject = document.getElementById("channels");
+            if( c_inject.scrollTop === (c_inject.scrollHeight - c_inject.offsetHeight))
+                c_inject.scroll(0, 0)
+            else
+                c_inject.scroll(0, c_inject.scrollTop + 250)
+        `);
+  }
 }
 
-class Stream extends Video {
-  owner = "";
-  in_progress = false;
-  guild_id = "";
-  channel_id = "";
-  download_process = undefined;
-  client_url = `file://${__dirname}/client/index.html`;
-
-  constructor(token, headless = true) {
+export class Stream extends Video {
+  constructor(token: string, headless = true) {
     super();
     const chrome_options = new chrome.Options();
     headless && chrome_options.addArguments("--headless");
@@ -146,68 +198,21 @@ class Stream extends Video {
     this.driver.executeScript(`localStorage.setItem("token", '"${token}"')`);
   }
 
-  open_guild() {
-    this.driver.executeScript(
-      `document.querySelector('[data-list-item-id="guildsnav___${this.guild_id}"]').click()`,
-    );
-  }
-
   is_full() {
-    return this.driver.executeScript(`
+    return this.driver?.executeScript(`
             return document.querySelector("[aria-label='Channel is full']")
         `);
   }
 
   is_locked() {
-    return this.driver.executeScript(`
+    return this.driver?.executeScript(`
             return document.querySelector("[data-list-item-id='channels___${this.channel_id}']").innerHTML.includes("Voice (Locked)")
         `);
-  }
-
-  scroll() {
-    this.driver.executeScript(`
-            var c_inject = document.getElementById("channels");
-            if( c_inject.scrollTop === (c_inject.scrollHeight - c_inject.offsetHeight))
-                c_inject.scroll(0, 0)
-            else
-                c_inject.scroll(0, c_inject.scrollTop + 250)
-        `);
-  }
-
-  join() {
-    var intJoin = setInterval(() => {
-      this.driver
-        .executeScript(
-          `document.querySelector("[data-list-item-id='channels___${this.channel_id}']").click()`,
-        )
-        .then(() => {
-          setTimeout(() => {
-            this.start();
-          }, 1000);
-
-          clearInterval(intJoin);
-        })
-        .catch(() => this.scroll());
-    }, 10);
-  }
-
-  start() {
-    this.driver
-      .executeScript(
-        `
-                var streamBtn_inject = document.querySelector('[aria-label="Share Your Screen"]')
-                !streamBtn_inject.className.includes('buttonActive-3FrkXp') &&
-                    streamBtn_inject.click()
-        `,
-      )
-      .catch((e) => e);
   }
 
   stop() {
     console.log("Stop");
     this.init = false;
-    this.driver.get(this.client_url);
+    this.driver?.get(this.client_url);
   }
 }
-
-exports.Stream = Stream;
