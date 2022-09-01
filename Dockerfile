@@ -6,7 +6,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 ARG TZ=Etc/UTC
 
 RUN apt-get update \ 
-    && apt-get install -y python3 make gcc g++ chromium-driver \
+    && apt-get install -y python3 make gcc g++ \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package.json yarn.lock ./
