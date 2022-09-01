@@ -2,7 +2,7 @@ require("dotenv").config();
 import Discord from "discord.js-selfbot-v13";
 import COMMANDS from "./commands";
 import { contextFactory } from "./commands/_utils";
-import { OWNER_ID, PREFIX, TOKEN } from "./config";
+import { PREFIX, TOKEN } from "./config";
 import { Stream } from "./stream";
 
 const client = new Discord.Client();
@@ -17,7 +17,6 @@ client.on("messageCreate", (msg) => {
   if (!msg.content.startsWith(PREFIX)) return;
   const { command, ...context } = contextFactory(stream, msg);
 
-  if (OWNER_ID && msg.author.id != OWNER_ID) return;
   const fn = COMMANDS[command];
   if (fn) {
     return fn({ command, ...context });

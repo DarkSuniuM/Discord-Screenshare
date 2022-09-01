@@ -1,6 +1,4 @@
 export const TOKEN = process.env.token as string;
-export const OWNER_ID = process.env.owner_id;
-export const LOG_CHANNEL_ID = process.env.log_channel_id;
 export const REJECT = "❌";
 export const ACCEPT = "✅";
 export const PREFIX = "*";
@@ -10,10 +8,8 @@ export const URL_REGEX = new RegExp(
 
 export default {
   TOKEN,
-  OWNER_ID,
-  LOG_CHANNEL_ID,
   REJECT,
   ACCEPT,
   PREFIX,
-  URL_REGEX
+  URL_REGEX,
 };
