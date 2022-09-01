@@ -1,7 +1,8 @@
 import type Discord from "discord.js-selfbot-v13";
 import webdriver from "selenium-webdriver";
 import chrome from "selenium-webdriver/chrome";
-import ytdl from "ytdl-core";
+import { VideoFormat } from "./types";
+const youtubedl: any = require("youtube-dl-exec");
 
 class Video {
   owner: string | undefined;
@@ -21,18 +22,26 @@ class Video {
     this.driver?.executeScript("video.innerHTML = null");
 
     if (youtube_dl) {
-      await msg.edit("Fetching video formats...").then(async (msg) => {
+      await msg.edit("Fetching video formats...").then(async () => {
         console.log("Fetching video formats...");
         try {
-          let info = await ytdl.getInfo(url);
-          let formats = info.formats.filter((f) => f.hasVideo && f.hasAudio);
+          const r = (await youtubedl(url, { dumpJson: true })) as {
+            formats: VideoFormat[];
+          };
+
+          let formats = r.formats
+            .map((f) => ({
+              ...f,
+              hasVideo: f.video_ext !== "none",
+              hasAudio: f.audio_ext !== "none",
+            }))
+            .filter((f) => f.hasVideo);
           formats = formats.filter((f) => (f?.height || 0) <= 720 && (f.fps || 0) <= 30);
           formats = formats.sort((a, b) => (b.height || 0) - (a.height || 0));
 
           url = formats[0].url;
         } catch (e) {
-          console.error({ ...(e as Error) });
-          msg.edit(":no_entry_sign: " + String(e));
+          throw e;
         }
       });
     }
