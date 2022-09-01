@@ -33,8 +33,8 @@ client.on("messageCreate", (msg) => {
         if (!loop) {
           loop = true;
           intLoop = setInterval(() => {
-            stream.current().then((result: any) => {
-              if (result >= stream.duration) stream.driver.executeScript("video.play()");
+            stream.current()?.then((result: any) => {
+              if (result >= stream.duration) stream.driver?.executeScript("video.play()");
             });
           }, 100);
           msg.reply("Video loop set");

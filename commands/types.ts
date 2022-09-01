@@ -1,5 +1,5 @@
-import type { Stream } from "../stream";
 import type Discord from "discord.js-selfbot-v13";
+import type { Stream } from "../stream";
 
 export type CommandContext = {
   stream: Stream;
