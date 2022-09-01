@@ -1,0 +1,33 @@
+export type VideoFormat = {
+  asr: null;
+  filesize: number;
+  fps: number;
+  height: number;
+  quality: number;
+  tbr: number;
+  width: number;
+  vbr: number;
+  language_preference: number;
+  source_preference: number;
+  downloader_options: { http_chunk_size: number };
+  format_id: string;
+  format_note: string;
+  audio_channels: null;
+  has_drm: boolean;
+  url: string;
+  language: string;
+  preference: null;
+  ext: string;
+  vcodec: string;
+  acodec: string;
+  dynamic_range: string;
+  container: string;
+  protocol: string;
+  video_ext: string;
+  audio_ext: string;
+  format: string;
+  resolution: string;
+  http_headers: {
+    [p: string]: string;
+  };
+};
