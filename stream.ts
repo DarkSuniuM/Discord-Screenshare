@@ -31,6 +31,7 @@ class Video {
 
           url = formats[0].url;
         } catch (e) {
+          console.error({ ...(e as Error) });
           msg.edit(":no_entry_sign: " + String(e));
         }
       });
