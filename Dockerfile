@@ -14,5 +14,7 @@ RUN yarn install --frozen-lockfile
 
 COPY . .
 
+RUN yarn build
+
 # Start Bot
 CMD ["yarn", "start"]
