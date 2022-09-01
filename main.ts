@@ -1,17 +1,18 @@
 require("dotenv").config();
-const { Stream } = require("./stream");
-const Discord = require("discord.js-selfbot-v13");
-const { writeFile } = require("fs");
+import Discord from "discord.js-selfbot-v13";
+import { writeFile } from "fs";
+import { LOG_CHANNEL_ID, OWNER_ID, TOKEN } from "./config";
+import { Stream } from "./stream";
 let users = require("./users.json");
 
-let intLoop = null;
+let intLoop: NodeJS.Timer | undefined;
 let loop = false;
 const reject = "❌";
 const accept = "✅";
 const prefix = "*";
 const client = new Discord.Client();
-const token = process.env.token;
-let stream = new Stream(token);
+
+let stream = new Stream(TOKEN);
 const url_expression =
   /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi;
 const url_regex = new RegExp(url_expression);
@@ -27,11 +28,11 @@ const helpMessage = `Help\n
     *stop | Stop streaming
 `;
 
-const notAllowed = (msg) => {
+const notAllowed = (msg: Discord.Message<boolean>) => {
   return (
     stream.owner !== msg.author.id &&
-    stream.owner !== process.env.owner_id &&
-    !msg.member.permissions.has("ADMINISTRATOR")
+    stream.owner !== OWNER_ID &&
+    !msg.member?.permissions.has("ADMINISTRATOR")
   );
 };
 
@@ -43,14 +44,10 @@ client.on("messageCreate", (msg) => {
   if (msg.content.startsWith(prefix)) {
     const content = msg.content.split(" ");
     const command = content[0].split(prefix)[1];
-    let voice_channel, id, url;
+    let voice_channel: Discord.VoiceBasedChannel | null | undefined;
+    let id: string | null, url: string | null;
 
-    if (
-      process.env.owner_id &&
-      !users.includes(msg.author.id) &&
-      msg.author.id != process.env.owner_id
-    )
-      return;
+    if (OWNER_ID && !users.includes(msg.author.id) && msg.author.id != OWNER_ID) return;
 
     switch (command) {
       case "p":
@@ -59,7 +56,7 @@ client.on("messageCreate", (msg) => {
           return;
         }
 
-        voice_channel = msg.member.voice.channel;
+        voice_channel = msg.member?.voice.channel;
         if (!voice_channel) {
           msg.reply("You need to be in a voice channel to use this command");
           return;
@@ -67,7 +64,7 @@ client.on("messageCreate", (msg) => {
 
         stream.in_progress = true;
         stream.owner = msg.author.id;
-        stream.guild_id = msg.guild.id;
+        stream.guild_id = msg.guild?.id || "";
         stream.channel_id = voice_channel.id;
         url = content[content.length - 1];
         if (!url || !url.match(url_regex)) {
@@ -78,7 +75,7 @@ client.on("messageCreate", (msg) => {
         !stream.in_loading
           ? msg.channel.send("Please wait...").then((msg) => {
               // not safe...
-              if (url.includes("youtube.com") || url.includes("youtu.be"))
+              if (url?.includes("youtube.com") || url?.includes("youtu.be"))
                 stream.load(url, true, msg);
               else stream.load(url, false, msg);
             })
@@ -98,7 +95,7 @@ client.on("messageCreate", (msg) => {
       case "seek":
         if (content[1]) notAllowed(msg) ? msg.react(reject) : stream.current(content[1]);
         else
-          stream.current().then((result) => {
+          stream.current().then((result: any) => {
             if (result) msg.channel.send(stream.hms(result));
             else msg.reply("N/A, try again later");
           });
@@ -109,7 +106,7 @@ client.on("messageCreate", (msg) => {
           if (!loop) {
             loop = true;
             intLoop = setInterval(() => {
-              stream.current().then((result) => {
+              stream.current().then((result: any) => {
                 if (result >= stream.duration)
                   stream.driver.executeScript("video.play()");
               });
@@ -125,7 +122,6 @@ client.on("messageCreate", (msg) => {
       case "stop":
         if (notAllowed(msg)) msg.react(reject);
         else {
-          stream.download_process && stream.download_process.kill();
           stream.stop();
           if (stream.in_loading) stream.killed = true;
           stream.in_loading = false;
@@ -138,12 +134,12 @@ client.on("messageCreate", (msg) => {
         break;
       case "add":
         id = content[content.length - 1];
-        if (!id || msg.author.id != process.env.owner_id) return;
+        if (!id || msg.author.id != OWNER_ID) return;
 
         users.push(id);
         writeFile("users.json", JSON.stringify(users), (err) => {
           if (err) {
-            msg.channel.send(err);
+            msg.channel.send(JSON.stringify(err));
             return;
           }
 
@@ -152,17 +148,17 @@ client.on("messageCreate", (msg) => {
         break;
       case "remove":
         id = content[content.length - 1];
-        if (!id || msg.author.id != process.env.owner_id) return;
+        if (!id || msg.author.id != OWNER_ID) return;
 
         if (!users.includes(id)) {
           msg.reply("User does not exist");
           return;
         }
 
-        users = users.filter((e) => e != id);
+        users = users.filter((e: string) => e != id);
         writeFile("users.json", JSON.stringify(users), (err) => {
           if (err) {
-            msg.channel.send(err);
+            msg.channel.send(JSON.stringify(err));
             return;
           }
 
@@ -175,14 +171,14 @@ client.on("messageCreate", (msg) => {
       default:
         msg.reply("Unknown command, type `*help` for list of commands");
     }
-
-    process.env.log_channel_id &&
+    if (LOG_CHANNEL_ID)
       client.channels.cache
-        .get(process.env.log_channel_id)
-        .send(
+        .get(LOG_CHANNEL_ID)
+        // @ts-ignore
+        ?.send(
           `Command: ${msg.content}\nSender: ${msg.author.username} | ${msg.author.id}`,
         );
   }
 });
 
-client.login(token);
+client.login(TOKEN);

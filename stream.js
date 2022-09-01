@@ -92,7 +92,7 @@ class Video {
     this.driver.executeScript("video.pause()");
   }
 
-  current(time = null) {
+  current(time = "") {
     if (time) {
       if (time[0] === "+" || time[0] === "-") {
         this.current().then((c) => {
@@ -117,6 +117,11 @@ class Video {
 }
 
 class Stream extends Video {
+  owner = "";
+  in_progress = false;
+  guild_id = "";
+  channel_id = "";
+  download_process = undefined;
   client_url = `file://${__dirname}/client/index.html`;
 
   constructor(token, headless = true) {
